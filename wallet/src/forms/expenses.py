@@ -3,6 +3,7 @@ from PyQt5 import uic
 import sqlite3
 from datetime import time
 from PyQt5.QtCore import QDate
+from datetime import datetime
 
 
 class Expense(QWidget):
@@ -29,6 +30,8 @@ class Expense(QWidget):
             self.labelEditErrorExpense.setText('Заполни поле типа расхода')
         elif not summa:
             self.labelEditErrorExpense.setText('Заполни поле суммы')
+        elif selected_date > datetime.today().strftime('%Y-%m-%d'):
+            self.labelEditErrorExpense.setText('Только за прошедшие и за нынешний день')
         else:
             try:
                 if ',' in str(summa):
@@ -65,7 +68,7 @@ class UpdateExpense(QWidget):
         self.EditExpenseButtonSave_2.clicked.connect(self.edit_expense)
 
     def save_dialog(self, info: list):
-        self.id = int(info[0].split()[0])
+        self.id = info[0][0]
         self.expense_date = info[1]
         year = int(self.expense_date.split('-')[0])
         month = int(self.expense_date.split('-')[1])
@@ -93,6 +96,8 @@ class UpdateExpense(QWidget):
             self.labelEditErrorExpense.setText('Заполни поле типа расхода')
         elif not summa:
             self.labelEditErrorExpense.setText('Заполни поле суммы')
+        elif selected_date > datetime.today().strftime('%Y-%m-%d'):
+            self.labelEditErrorExpense.setText('Только за прошедшие и за нынешний день')
         else:
             try:
                 if ',' in str(summa):

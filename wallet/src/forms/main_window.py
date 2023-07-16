@@ -18,8 +18,8 @@ class Wallet(QMainWindow):
         self.update_form_income = None
         self.id_info_expense = None
         self.id_info_income = None
-        self.id1 = set()
-        self.id2 = set()
+        self.id1 = []
+        self.id2 = []
         self.edit_expenses = None
         self.add_expenses = None
         self.add_incomes = None
@@ -29,6 +29,7 @@ class Wallet(QMainWindow):
         self.con = sqlite3.connect('wallet.sqlite')
 
         self.setupComboBox()
+        self.setupComboBoxSort()
 
         self.addIncomeButton.clicked.connect(self.add_income)
         self.editIncomeButton.clicked.connect(self.edit_income)
@@ -44,7 +45,7 @@ class Wallet(QMainWindow):
 
         self.tableWidget.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.tableWidget_2.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-
+        self.time = 10e20
         self.update_income()
         self.update_expense()
         self.update_sum()
@@ -53,16 +54,22 @@ class Wallet(QMainWindow):
         self.comboBoxIncome.addItems(['Все', 'Сегодня', 'Вчера', 'Неделю', 'Месяц', 'Полгода', 'Год', 'Другое'])
         self.comboBoxExpense.addItems(['Все', 'Сегодня', 'Вчера', 'Неделю', 'Месяц', 'Полгода', 'Год', 'Другое'])
 
+    def setupComboBoxSort(self):
+        self.comboBoxSortIncome.addItems(['Никак', '↑ Даты', '↓ Даты', '↑ Дохода', '↓ Дохода'])
+        self.comboBoxSortExpense.addItems(['Никак', '↑ Даты', '↓ Даты', '↑ Расхода', '↓ Расхода'])
+
     def update_sum(self):
         cur = self.con.cursor()
         com1 = """
-                SELECT SUM(expense_sum) FROM expense;
+                SELECT SUM(expense_sum) FROM expense WHERE
+                (strftime('%s', 'now') - strftime('%s', expense_date)) / (86040 * (?)) <= (?);
         """
         com2 = """
-                SELECT SUM(income_sum) FROM income;
+                SELECT SUM(income_sum) FROM income WHERE
+                (strftime('%s', 'now') - strftime('%s', income_date)) / (86040 * (?)) <= (?);
         """
-        result1 = cur.execute(com1).fetchone()[0]
-        result2 = cur.execute(com2).fetchone()[0]
+        result1 = cur.execute(com1, (self.time, self.time)).fetchone()[0]
+        result2 = cur.execute(com2, (self.time, self.time)).fetchone()[0]
         if result1 is None:
             result1 = 0
         if result2 is None:
@@ -79,9 +86,10 @@ class Wallet(QMainWindow):
     def update_income(self):
         cur = self.con.cursor()
         com = """
-        SELECT id, income_date, income_sum, income_type FROM income;
+        SELECT id, income_date, income_sum, income_type FROM income WHERE
+        ((strftime('%s', 'now') - strftime('%s', income_date)) / (86400 * (?))) <= (?);
         """
-        result = cur.execute(com).fetchall()
+        result = cur.execute(com, (self.time, self.time)).fetchall()
         self.tableWidget.setRowCount(len(result))
 
         if not result:
@@ -94,7 +102,8 @@ class Wallet(QMainWindow):
             self.tableWidget.setVerticalHeaderItem(i, QTableWidgetItem(''))
             for j, itm in enumerate(row):
                 if j == 0:
-                    self.id1.add(str(itm) + ' ' + str(i + 1))
+                    if [itm, i + 1] not in self.id1:
+                        self.id1.append([itm, i + 1])
                     self.tableWidget.setItem(i, j, QTableWidgetItem(str(i + 1)))
 
                 else:
@@ -108,9 +117,10 @@ class Wallet(QMainWindow):
     def update_expense(self):
         cur = self.con.cursor()
         com = """
-        SELECT id, expense_date, expense_sum, expense_type FROM expense;
+        SELECT id, expense_date, expense_sum, expense_type FROM expense WHERE
+        ((strftime('%s', 'now') - strftime('%s', expense_date)) / (86400 * (?))) <= (?);
         """
-        result = cur.execute(com).fetchall()
+        result = cur.execute(com, (self.time, self.time)).fetchall()
         self.tableWidget_2.setRowCount(len(result))
 
         if not result:
@@ -123,7 +133,8 @@ class Wallet(QMainWindow):
             self.tableWidget_2.setVerticalHeaderItem(i, QTableWidgetItem(''))
             for j, itm in enumerate(row):
                 if j == 0:
-                    self.id2.add(str(itm) + ' ' + str(i + 1))
+                    if [itm, i + 1] not in self.id2:
+                        self.id2.append([itm, i + 1])
                     self.tableWidget_2.setItem(i, j,
                                                QTableWidgetItem(str(i + 1)))
 
@@ -149,7 +160,7 @@ class Wallet(QMainWindow):
             # self.tableWidget.currentRow() возвращает индекс текущей выбранной строки, а i - столбца
             # В функцию передаётся список значений выбранной строки.
             for i in self.id1:
-                if int(i.split()[1]) == self.tableWidget.currentRow() + 1:
+                if i[1] == self.tableWidget.currentRow() + 1:
                     self.id_info_income = i
             self.update_form_income.save_dialog([self.id_info_income] +
                                                 [self.tableWidget.item(self.tableWidget.currentRow(), i).text()
@@ -166,17 +177,21 @@ class Wallet(QMainWindow):
         # Выбрана ли строка?
         if len(self.tableWidget.selectedItems()) == 1:
             for i in self.id1:
-                if int(i.split()[1]) == self.tableWidget.currentRow() + 1:
+                if i[1] == self.tableWidget.currentRow() + 1:
                     self.id_info_income = i
 
             cur = self.con.cursor()
             com = '''
             DELETE FROM income WHERE id = (?);
             '''
-            cur.execute(com, (int(self.id_info_income.split()[0]), ))
-            for i in self.id1:
-                if int(i.split()[0]) == self.id_info_income:
-                    self.id1.remove(i)
+            cur.execute(com, (self.id_info_income[0], ))
+
+            for i in range(len(self.id1)):
+                if self.id1[i][0] == self.id_info_income:
+                    del self.id1[i]
+                    for j in range(i, len(self.id1)):
+                        self.id1[j] = [self.id1[j][0], self.id1[j][1] - 1]
+
             self.con.commit()
             self.update_income()
 
@@ -185,7 +200,32 @@ class Wallet(QMainWindow):
             self.labelIncome.setText('Некорректные данные')
 
     def learn_income(self):
-        ...
+        period = self.comboBoxIncome.currentText()
+        sort = self.comboBoxSortIncome.currentText()
+        d = ['Все', 'Сегодня', 'Вчера', 'Неделю', 'Месяц', 'Полгода', 'Год', 'Другое']
+        if period == 'Сегодня':
+            self.time = 0
+        if period == 'Вчера':
+            self.time = 1
+        if period == 'Неделю':
+            self.time = 7
+        if period == 'Месяц':
+            self.time = 31
+        if period == 'Полгода':
+            self.time = 183
+        if period == 'Год':
+            self.time = 365
+        if period == 'Другое':
+            ...
+
+        if sort == '↑ Даты':
+            ...
+        elif sort == '↓ Даты':
+            ...
+        elif sort == '↑ Суммы':
+            ...
+        elif sort == '↑ Суммы':
+            ...
 
     def add_expense(self):
         self.add_expenses = Expense(self.update_expense)
@@ -201,7 +241,7 @@ class Wallet(QMainWindow):
             # self.tableWidget.currentRow() возвращает индекс текущей выбранной строки, а i - столбца
             # В функцию передаётся список значений выбранной строки.
             for i in self.id2:
-                if int(i.split()[1]) == self.tableWidget_2.currentRow() + 1:
+                if i[1] == self.tableWidget_2.currentRow() + 1:
                     self.id_info_expense = i
             self.update_form_expense.save_dialog([self.id_info_expense] +
                                                  [self.tableWidget_2.item(self.tableWidget_2.currentRow(), i).text()
@@ -219,17 +259,20 @@ class Wallet(QMainWindow):
 
         if len(self.tableWidget_2.selectedItems()) == 1:
             for i in self.id2:
-                if int(i.split()[1]) == self.tableWidget_2.currentRow() + 1:
+                if i[1] == self.tableWidget_2.currentRow() + 1:
                     self.id_info_expense = i
 
             cur = self.con.cursor()
             com = '''
                     DELETE FROM expense WHERE id = (?);
                     '''
-            cur.execute(com, (int(self.id_info_expense.split()[0]),))
-            for i in self.id2:
-                if int(i.split()[0]) == self.id_info_expense:
-                    self.id2.remove(i)
+            cur.execute(com, (self.id_info_expense[0],))
+
+            for i in range(len(self.id2)):
+                if self.id2[i][0] == self.id_info_expense:
+                    del self.id2[i]
+                    for j in range(i, len(self.id2)):
+                        self.id2[j] = [self.id2[j][0], self.id2[j][1] - 1]
             self.con.commit()
             self.update_expense()
 
