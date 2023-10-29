@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QCalendarWidget
+from PyQt5.QtWidgets import QWidget
 from PyQt5 import uic
 import sqlite3
 from datetime import time
@@ -7,6 +7,7 @@ from datetime import datetime
 
 
 class Expense(QWidget):
+    """Виджет добавления расхода"""
     def __init__(self, update):
         super().__init__()
         uic.loadUi('ui/addexpense.ui', self)
@@ -16,10 +17,15 @@ class Expense(QWidget):
         self.update = update
 
     def add_info_expense(self):
+        """Получение данных и вставление данных в таблицу"""
         # Дата
         selected_date = self.calendarWidget.selectedDate().toString("yyyy-MM-dd")
         # Часы и секунды
         hour, minute = self.timeEdit.time().hour(), self.timeEdit.time().minute()
+        if hour < 10:
+            hour = '0' + str(hour)
+        else:
+            hour = str(hour)
         if minute < 10:
             minute = '0' + str(minute)
         # Сумма
@@ -28,6 +34,8 @@ class Expense(QWidget):
         type_expense = self.lineEdit_2.text()
         if not type_expense:
             self.labelEditErrorExpense.setText('Заполни поле типа расхода')
+        elif len(type_expense) > 100:
+            self.labelEditErrorExpense.setText('Длина типа расхода только <= 100')
         elif not summa:
             self.labelEditErrorExpense.setText('Заполни поле суммы')
         elif selected_date > datetime.today().strftime('%Y-%m-%d'):
@@ -56,6 +64,7 @@ class Expense(QWidget):
 
 
 class UpdateExpense(QWidget):
+    """Обновление уже существующей записи"""
     def __init__(self, update):
         super().__init__()
         uic.loadUi('ui/editexpense.ui', self)
@@ -68,6 +77,7 @@ class UpdateExpense(QWidget):
         self.EditExpenseButtonSave_2.clicked.connect(self.edit_expense)
 
     def save_dialog(self, info: list):
+        """Получение данных уже в существующей записи"""
         self.id = info[0][0]
         self.expense_date = info[1]
         year = int(self.expense_date.split('-')[0])
@@ -82,10 +92,15 @@ class UpdateExpense(QWidget):
         self.lineEdit_2.setText(str(info[3]))
 
     def edit_expense(self):
+        """Получение данных уже в существующей записи"""
         # Дата
         selected_date = self.calendarWidget.selectedDate().toString("yyyy-MM-dd")
         # Часы и секунды
         hour, minute = self.timeEdit.time().hour(), self.timeEdit.time().minute()
+        if hour < 10:
+            hour = '0' + str(hour)
+        else:
+            hour = str(hour)
         if minute < 10:
             minute = '0' + str(minute)
         # Сумма
@@ -114,7 +129,8 @@ class UpdateExpense(QWidget):
                 self.labelEditErrorExpense.setText('Число только больше 0')
             else:
                 cur = self.con.cursor()
-                cur.execute('UPDATE expense SET expense_date = (?), expense_sum = (?), expense_type = (?) WHERE id = (?);',
+                cur.execute('UPDATE expense '
+                            'SET expense_date = (?), expense_sum = (?), expense_type = (?) WHERE id = (?);',
                             (f"{selected_date} {hour}:{minute}", summa, type_expense, self.id))
                 self.con.commit()
                 self.update()

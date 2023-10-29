@@ -91,7 +91,7 @@
          </font>
         </property>
         <property name="text">
-         <string>   Дата(в календаре и часы с минутами)</string>
+         <string>   Дата(нулевой часовой пояс)</string>
         </property>
        </widget>
       </item>

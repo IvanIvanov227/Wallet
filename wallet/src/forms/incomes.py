@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QCalendarWidget
+from PyQt5.QtWidgets import QWidget
 from PyQt5 import uic
 import sqlite3
 from datetime import time
@@ -7,6 +7,7 @@ from datetime import datetime
 
 
 class Income(QWidget):
+    """Виджет добавления дохода"""
     def __init__(self, update):
         super().__init__()
         uic.loadUi('ui/addincome.ui', self)
@@ -16,10 +17,16 @@ class Income(QWidget):
         self.update = update
 
     def add_info_income(self):
+        """Получение данных и вставление данных в таблицу"""
         # Дата
         selected_date = self.calendarWidget.selectedDate().toString("yyyy-MM-dd")
         # Часы и секунды
-        hour, minute = self.timeEdit.time().hour(), self.timeEdit.time().minute()
+        hour = self.timeEdit.time().hour()
+        if hour < 10:
+            hour = '0' + str(hour)
+        else:
+            hour = str(hour)
+        minute = self.timeEdit.time().minute()
         if minute < 10:
             minute = '0' + str(minute)
         # Сумма
@@ -28,6 +35,8 @@ class Income(QWidget):
         type_income = self.lineEdit_2.text()
         if not type_income:
             self.labelEditErrorIncome.setText('Заполни поле типа дохода')
+        elif len(type_income) > 100:
+            self.labelEditErrorIncome.setText('Длина типа дохода только <= 100')
         elif not summa:
             self.labelEditErrorIncome.setText('Заполни поле суммы')
         elif selected_date > datetime.today().strftime('%Y-%m-%d'):
@@ -56,6 +65,7 @@ class Income(QWidget):
 
 
 class UpdateIncome(QWidget):
+    """Обновление уже существующей записи"""
     def __init__(self, update):
         super().__init__()
         uic.loadUi('ui/editincome.ui', self)
@@ -68,6 +78,7 @@ class UpdateIncome(QWidget):
         self.EditIncomeButtonSave.clicked.connect(self.edit_income)
 
     def save_dialog(self, info: list):
+        """Получение данных уже в существующей записи"""
         self.id = info[0][0]
         self.income_date = info[1]
         year = int(self.income_date.split('-')[0])
@@ -82,10 +93,15 @@ class UpdateIncome(QWidget):
         self.lineEdit_2.setText(str(info[3]))
 
     def edit_income(self):
+        """Получение данных и вставление данных в таблицу"""
         # Дата
         selected_date = self.calendarWidget.selectedDate().toString("yyyy-MM-dd")
         # Часы и секунды
         hour, minute = self.timeEdit_2.time().hour(), self.timeEdit_2.time().minute()
+        if hour < 10:
+            hour = '0' + str(hour)
+        else:
+            hour = str(hour)
         if minute < 10:
             minute = '0' + str(minute)
         # Сумма
